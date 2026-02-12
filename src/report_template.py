@@ -29,24 +29,28 @@ def render_report(
     opportunities: list[dict],
     report_date: str,
     instance_url: str,
+    owner_name: str,
 ) -> tuple[str, str]:
-    """Return (subject, html_body) for the report email."""
+    """Return (subject, html_body) for a personalized report email."""
+    stale = [o for o in opportunities if o.get("_is_stale")]
+    active = [o for o in opportunities if not o.get("_is_stale")]
     count = len(opportunities)
     subject = f"Weekly Opportunity Report - {report_date} ({count} opportunities)"
 
     if not opportunities:
-        html = _render_empty(report_date)
+        html = _render_empty(report_date, owner_name)
     else:
-        html = _render_table(opportunities, report_date, instance_url)
+        html = _render_full(stale, active, report_date, instance_url, owner_name)
 
     return subject, html
 
 
-def _render_empty(report_date: str) -> str:
+def _render_empty(report_date: str, owner_name: str) -> str:
     return f"""\
 <div style="font-family: Arial, sans-serif; max-width: 700px; margin: 0 auto;">
   <h2 style="color: #333;">Weekly Opportunity Activity Report</h2>
   <p style="color: #666;">Generated: {report_date}</p>
+  <p style="color: #555;">Hi {owner_name},</p>
   <div style="background: #f0f7ff; border: 1px solid #cce0ff; border-radius: 6px;
               padding: 20px; text-align: center; margin: 20px 0;">
     <p style="color: #555; font-size: 16px; margin: 0;">
@@ -57,10 +61,54 @@ def _render_empty(report_date: str) -> str:
 </div>"""
 
 
-def _render_table(
-    opportunities: list[dict],
+def _render_full(
+    stale: list[dict],
+    active: list[dict],
     report_date: str,
     instance_url: str,
+    owner_name: str,
+) -> str:
+    total = len(stale) + len(active)
+    sections = []
+
+    if stale:
+        sections.append(_render_section(
+            stale, instance_url,
+            title="Needs Attention — No activity in 2+ months",
+            title_color="#c0392b",
+            header_bg="#c0392b",
+        ))
+
+    if active:
+        sections.append(_render_section(
+            active, instance_url,
+            title="Active Opportunities",
+            title_color="#333",
+            header_bg="#34495e",
+        ))
+
+    sections_html = "\n".join(sections)
+
+    return f"""\
+<div style="font-family: Arial, sans-serif; max-width: 900px; margin: 0 auto;">
+  <h2 style="color: #333;">Weekly Opportunity Activity Report</h2>
+  <p style="color: #666;">Generated: {report_date}</p>
+  <p style="color: #555;">Hi {owner_name},</p>
+  <p style="color: #555; font-size: 14px; margin-bottom: 16px;">
+    You have <strong>{total}</strong> open opportunit{"y" if total == 1 else "ies"} with 2+ human touches.
+    {f'<span style="color: #c0392b; font-weight: bold;">{len(stale)} need{"s" if len(stale) == 1 else ""} attention.</span>' if stale else ''}
+  </p>
+{sections_html}
+  {_footer()}
+</div>"""
+
+
+def _render_section(
+    opportunities: list[dict],
+    instance_url: str,
+    title: str,
+    title_color: str,
+    header_bg: str,
 ) -> str:
     rows = []
     for i, opp in enumerate(opportunities):
@@ -71,7 +119,7 @@ def _render_table(
         stage = opp.get("StageName", "—")
         amount = _format_amount(opp.get("Amount"))
         close_date = _format_date(opp.get("CloseDate"))
-        owner = _get_nested(opp, "Owner", "Name") or "—"
+        last_touched = opp.get("_last_touched", "N/A")
         touches = opp.get("_touch_count", 0)
         touch_style = "font-weight: bold; color: #d35400;" if touches >= 5 else ""
 
@@ -84,43 +132,37 @@ def _render_table(
       <td style="padding: 8px 12px; border-bottom: 1px solid #eee;">{stage}</td>
       <td style="padding: 8px 12px; border-bottom: 1px solid #eee; text-align: right;">{amount}</td>
       <td style="padding: 8px 12px; border-bottom: 1px solid #eee;">{close_date}</td>
-      <td style="padding: 8px 12px; border-bottom: 1px solid #eee;">{owner}</td>
+      <td style="padding: 8px 12px; border-bottom: 1px solid #eee;">{last_touched}</td>
       <td style="padding: 8px 12px; border-bottom: 1px solid #eee; text-align: center;{touch_style}">{touches}</td>
     </tr>""")
 
     rows_html = "\n".join(rows)
+
     count = len(opportunities)
 
     return f"""\
-<div style="font-family: Arial, sans-serif; max-width: 900px; margin: 0 auto;">
-  <h2 style="color: #333;">Weekly Opportunity Activity Report</h2>
-  <p style="color: #666;">Generated: {report_date}</p>
-  <p style="color: #555; font-size: 14px; margin-bottom: 16px;">
-    <strong>{count}</strong> open opportunit{"y" if count == 1 else "ies"} with 2+ human touches.
-  </p>
+  <h3 style="color: {title_color}; margin-top: 24px;">{title} ({count})</h3>
   <table style="width: 100%; border-collapse: collapse; font-size: 14px;">
     <thead>
-      <tr style="background: #34495e; color: #fff;">
+      <tr style="background: {header_bg}; color: #fff;">
         <th style="padding: 10px 12px; text-align: left;">Opportunity</th>
         <th style="padding: 10px 12px; text-align: left;">Account</th>
         <th style="padding: 10px 12px; text-align: left;">Stage</th>
         <th style="padding: 10px 12px; text-align: right;">Amount</th>
         <th style="padding: 10px 12px; text-align: left;">Close Date</th>
-        <th style="padding: 10px 12px; text-align: left;">Owner</th>
+        <th style="padding: 10px 12px; text-align: left;">Last Touched</th>
         <th style="padding: 10px 12px; text-align: center;">Touches</th>
       </tr>
     </thead>
     <tbody>
 {rows_html}
     </tbody>
-  </table>
-  {_footer()}
-</div>"""
+  </table>"""
 
 
 def _footer() -> str:
     return """\
 <p style="color: #999; font-size: 12px; margin-top: 24px; border-top: 1px solid #eee; padding-top: 12px;">
-    You received this because you are subscribed in <code>subscribers.yaml</code>.
-    To unsubscribe, open a PR to remove your email from that file.
+    You received this report because you are the owner of the listed opportunities.
+    Contact your administrator to unsubscribe.
   </p>"""

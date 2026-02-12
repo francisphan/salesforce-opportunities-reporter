@@ -72,7 +72,12 @@ def _save_token(creds: Credentials):
     TOKEN_CACHE.write_text(creds.to_json())
 
 
-def send_report(subject: str, html_body: str, recipients: list[str]) -> None:
+def send_report(
+    subject: str,
+    html_body: str,
+    recipients: list[str],
+    cc: list[str] | None = None,
+) -> None:
     """Send an HTML email to all recipients via Gmail API."""
     sender = os.environ.get("GMAIL_SENDER", "me")
     creds = _get_credentials()
@@ -82,15 +87,18 @@ def send_report(subject: str, html_body: str, recipients: list[str]) -> None:
     msg["Subject"] = subject
     msg["From"] = sender
     msg["To"] = ", ".join(recipients)
+    if cc:
+        msg["Cc"] = ", ".join(cc)
 
     plain_text = "This report is best viewed in an HTML-capable email client."
     msg.attach(MIMEText(plain_text, "plain"))
     msg.attach(MIMEText(html_body, "html"))
 
+    all_recipients = recipients + (cc or [])
     raw = base64.urlsafe_b64encode(msg.as_bytes()).decode()
     service.users().messages().send(
         userId="me",
         body={"raw": raw},
     ).execute()
 
-    print(f"Report sent to {len(recipients)} recipient(s).")
+    print(f"Report sent to {len(all_recipients)} recipient(s).")
