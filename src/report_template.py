@@ -119,6 +119,7 @@ def _render_section(
         name = opp.get("Name", "—")
         account = _get_nested(opp, "Account", "Name") or "—"
         email = _get_nested(opp, "Account", "PersonEmail") or "—"
+        language = _get_nested(opp, "Account", "Primary_Language__pc") or "—"
         stage = opp.get("StageName", "—")
         amount = _format_amount(opp.get("Amount"))
         last_touched = opp.get("_last_touched", "N/A")
@@ -132,6 +133,7 @@ def _render_section(
       </td>
       <td style="padding: 8px 12px; border-bottom: 1px solid #eee;">{account}</td>
       <td style="padding: 8px 12px; border-bottom: 1px solid #eee;">{email}</td>
+      <td style="padding: 8px 12px; border-bottom: 1px solid #eee;">{language}</td>
       <td style="padding: 8px 12px; border-bottom: 1px solid #eee;">{stage}</td>
       <td style="padding: 8px 12px; border-bottom: 1px solid #eee; text-align: right;">{amount}</td>
       <td style="padding: 8px 12px; border-bottom: 1px solid #eee;">{last_touched}</td>
@@ -150,6 +152,7 @@ def _render_section(
         <th style="padding: 10px 12px; text-align: left;">Opportunity</th>
         <th style="padding: 10px 12px; text-align: left;">Account</th>
         <th style="padding: 10px 12px; text-align: left;">Email</th>
+        <th style="padding: 10px 12px; text-align: left;">Language</th>
         <th style="padding: 10px 12px; text-align: left;">Stage</th>
         <th style="padding: 10px 12px; text-align: right;">Amount</th>
         <th style="padding: 10px 12px; text-align: left;">Last Touched</th>
