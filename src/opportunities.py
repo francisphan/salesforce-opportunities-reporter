@@ -21,9 +21,9 @@ BATCH_SIZE = 200
 STALE_THRESHOLD_DAYS = 60  # 2 months
 
 OPEN_OPPS_SOQL = """
-    SELECT Id, Name, StageName, Amount, CloseDate,
+    SELECT Id, Name, StageName, Amount,
            OwnerId, Owner.Name, Owner.Email,
-           AccountId, Account.Name, LastModifiedDate
+           AccountId, Account.Name, Account.PersonEmail, LastModifiedDate
     FROM Opportunity
     WHERE IsClosed = false
       AND CreatedDate = LAST_N_MONTHS:6

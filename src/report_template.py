@@ -116,9 +116,9 @@ def _render_section(
         opp_url = f"{instance_url}/lightning/r/Opportunity/{opp['Id']}/view"
         name = opp.get("Name", "—")
         account = _get_nested(opp, "Account", "Name") or "—"
+        email = _get_nested(opp, "Account", "PersonEmail") or "—"
         stage = opp.get("StageName", "—")
         amount = _format_amount(opp.get("Amount"))
-        close_date = _format_date(opp.get("CloseDate"))
         last_touched = opp.get("_last_touched", "N/A")
         touches = opp.get("_touch_count", 0)
         touch_style = "font-weight: bold; color: #d35400;" if touches >= 5 else ""
@@ -129,9 +129,9 @@ def _render_section(
         <a href="{opp_url}" style="color: #2a6496; text-decoration: none;">{name}</a>
       </td>
       <td style="padding: 8px 12px; border-bottom: 1px solid #eee;">{account}</td>
+      <td style="padding: 8px 12px; border-bottom: 1px solid #eee;">{email}</td>
       <td style="padding: 8px 12px; border-bottom: 1px solid #eee;">{stage}</td>
       <td style="padding: 8px 12px; border-bottom: 1px solid #eee; text-align: right;">{amount}</td>
-      <td style="padding: 8px 12px; border-bottom: 1px solid #eee;">{close_date}</td>
       <td style="padding: 8px 12px; border-bottom: 1px solid #eee;">{last_touched}</td>
       <td style="padding: 8px 12px; border-bottom: 1px solid #eee; text-align: center;{touch_style}">{touches}</td>
     </tr>""")
@@ -147,9 +147,9 @@ def _render_section(
       <tr style="background: {header_bg}; color: #fff;">
         <th style="padding: 10px 12px; text-align: left;">Opportunity</th>
         <th style="padding: 10px 12px; text-align: left;">Account</th>
+        <th style="padding: 10px 12px; text-align: left;">Email</th>
         <th style="padding: 10px 12px; text-align: left;">Stage</th>
         <th style="padding: 10px 12px; text-align: right;">Amount</th>
-        <th style="padding: 10px 12px; text-align: left;">Close Date</th>
         <th style="padding: 10px 12px; text-align: left;">Last Touched</th>
         <th style="padding: 10px 12px; text-align: center;">Touches</th>
       </tr>
