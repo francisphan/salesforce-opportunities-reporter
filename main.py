@@ -45,10 +45,6 @@ def main():
     opps = opportunities.get_human_touched_opportunities(sf_holder)
     print(f"Found {len(opps)} opportunities with 2+ human touches")
 
-    if not opps:
-        print("No qualifying opportunities. Skipping email.")
-        sys.exit(0)
-
     # Group opportunities by owner email
     opps_by_owner = defaultdict(list)
     for opp in opps:
@@ -56,22 +52,23 @@ def main():
         if owner_email:
             opps_by_owner[owner_email.lower()].append(opp)
 
-    # Send personalized emails to subscribers who own opportunities
+    # Send personalized emails to all subscribers (even if they have 0 opps)
     today = date.today().strftime("%B %d, %Y")
     cc = load_cc()
     sent = 0
 
-    for owner_email, owner_opps in opps_by_owner.items():
-        if owner_email not in subscribers:
-            continue
+    for subscriber in subscribers:
+        owner_opps = opps_by_owner.get(subscriber, [])
+        owner_name = "there"
+        if owner_opps:
+            owner_name = (owner_opps[0].get("Owner", {}) or {}).get("Name", "there")
 
-        owner_name = (owner_opps[0].get("Owner", {}) or {}).get("Name", "there")
         subject, html = report_template.render_report(
             owner_opps, today, instance_url, owner_name,
         )
 
-        print(f"Sending {len(owner_opps)} opportunities to {owner_email}...")
-        email_sender.send_report(subject, html, [owner_email], cc=cc)
+        print(f"Sending {len(owner_opps)} opportunities to {subscriber}...")
+        email_sender.send_report(subject, html, [subscriber], cc=cc)
         sent += 1
 
     print(f"Done. Sent reports to {sent} owner(s).")

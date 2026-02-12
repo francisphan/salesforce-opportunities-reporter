@@ -93,12 +93,12 @@ def _parse_sf_datetime(dt_str: str) -> datetime:
 
 
 def get_human_touched_opportunities(sf_holder: list) -> list[dict]:
-    """Return open opportunities with >= 2 human touches, enriched with touch data.
+    """Return all open opportunities (last 6 months, excluding TVG), enriched with touch data.
 
     Each opportunity is enriched with:
-      _touch_count: int — number of human Tasks
-      _last_touched: str — ISO date of most recent human Task
-      _is_stale: bool — True if last touch was > 2 months ago
+      _touch_count: int — number of human Tasks (0 if none)
+      _last_touched: str — ISO date of most recent human Task, or "Never"
+      _is_stale: bool — True if last touch was > 2 months ago or never touched
       Owner.Email: str — owner's email for per-person routing
     """
     # Step 1: Get open opportunities (last 6 months, excluding TVG)
@@ -111,18 +111,11 @@ def get_human_touched_opportunities(sf_holder: list) -> list[dict]:
     # Step 2: Get all Tasks linked to these opportunities
     tasks = _query_batched(sf_holder, TASKS_SOQL_TEMPLATE, opp_ids)
 
-    # Step 3: Collect all user IDs that created Tasks
-    all_user_ids = set()
-    for t in tasks:
-        all_user_ids.add(t["CreatedById"])
+    # Step 3: Collect all user IDs that created Tasks and filter to humans
+    all_user_ids = {t["CreatedById"] for t in tasks}
+    human_ids = _get_human_user_ids(sf_holder, list(all_user_ids)) if all_user_ids else set()
 
-    if not all_user_ids:
-        return []
-
-    # Step 4: Determine which users are human
-    human_ids = _get_human_user_ids(sf_holder, list(all_user_ids))
-
-    # Step 5: Count human touches and track last touch date per opportunity
+    # Step 4: Count human touches and track last touch date per opportunity
     touch_count = defaultdict(int)
     last_touch = {}  # opp_id -> most recent CreatedDate string
     for t in tasks:
@@ -133,21 +126,21 @@ def get_human_touched_opportunities(sf_holder: list) -> list[dict]:
             if opp_id not in last_touch or created > last_touch[opp_id]:
                 last_touch[opp_id] = created
 
-    # Step 6: Filter for >= 2 touches and enrich
+    # Step 5: Enrich all opportunities with touch data
     now = datetime.now(timezone.utc)
     stale_cutoff = now - timedelta(days=STALE_THRESHOLD_DAYS)
-    opp_map = {o["Id"]: o for o in opps}
-    qualifying = []
 
-    for opp_id, count in touch_count.items():
-        if count >= 2:
-            opp = opp_map[opp_id]
-            opp["_touch_count"] = count
+    for opp in opps:
+        opp_id = opp["Id"]
+        opp["_touch_count"] = touch_count.get(opp_id, 0)
+        if opp_id in last_touch:
             opp["_last_touched"] = last_touch[opp_id][:10]  # YYYY-MM-DD
             last_dt = _parse_sf_datetime(last_touch[opp_id])
             opp["_is_stale"] = last_dt < stale_cutoff
-            qualifying.append(opp)
+        else:
+            opp["_last_touched"] = "Never"
+            opp["_is_stale"] = True  # no touches at all = needs attention
 
     # Sort: stale first (high priority), then by touch count descending
-    qualifying.sort(key=lambda o: (not o["_is_stale"], -o["_touch_count"]))
-    return qualifying
+    opps.sort(key=lambda o: (not o["_is_stale"], -o["_touch_count"]))
+    return opps

@@ -51,10 +51,11 @@ def _render_empty(report_date: str, owner_name: str) -> str:
   <h2 style="color: #333;">Weekly Opportunity Activity Report</h2>
   <p style="color: #666;">Generated: {report_date}</p>
   <p style="color: #555;">Hi {owner_name},</p>
+  {_report_scope()}
   <div style="background: #f0f7ff; border: 1px solid #cce0ff; border-radius: 6px;
               padding: 20px; text-align: center; margin: 20px 0;">
     <p style="color: #555; font-size: 16px; margin: 0;">
-      No open opportunities with 2+ human touches this week.
+      You have no open opportunities with human activity this week.
     </p>
   </div>
   {_footer()}
@@ -94,8 +95,9 @@ def _render_full(
   <h2 style="color: #333;">Weekly Opportunity Activity Report</h2>
   <p style="color: #666;">Generated: {report_date}</p>
   <p style="color: #555;">Hi {owner_name},</p>
+  {_report_scope()}
   <p style="color: #555; font-size: 14px; margin-bottom: 16px;">
-    You have <strong>{total}</strong> open opportunit{"y" if total == 1 else "ies"} with 2+ human touches.
+    You have <strong>{total}</strong> open opportunit{"y" if total == 1 else "ies"} with human activity.
     {f'<span style="color: #c0392b; font-weight: bold;">{len(stale)} need{"s" if len(stale) == 1 else ""} attention.</span>' if stale else ''}
   </p>
 {sections_html}
@@ -158,6 +160,14 @@ def _render_section(
 {rows_html}
     </tbody>
   </table>"""
+
+
+def _report_scope() -> str:
+    return """\
+<p style="color: #888; font-size: 13px; font-style: italic; margin-bottom: 16px;">
+    This report shows all open opportunities created in the past 6 months (TVG opportunities are excluded).
+    Touch counts reflect human interactions (tasks) only — automated system activity is excluded.
+  </p>"""
 
 
 def _footer() -> str:
