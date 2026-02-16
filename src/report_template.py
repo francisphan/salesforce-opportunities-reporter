@@ -168,7 +168,7 @@ def _render_section(
 def _report_scope() -> str:
     return """\
 <p style="color: #888; font-size: 13px; font-style: italic; margin-bottom: 16px;">
-    This report shows all open opportunities created in the past 6 months (TVG opportunities are excluded).
+    This automated weekly report shows all open opportunities created in the past 6 months (TVG opportunities are excluded).
     Touch counts reflect human interactions (tasks) only — automated system activity is excluded.
   </p>"""
 
@@ -177,5 +177,5 @@ def _footer() -> str:
     return """\
 <p style="color: #999; font-size: 12px; margin-top: 24px; border-top: 1px solid #eee; padding-top: 12px;">
     You received this report because you are the owner of the listed opportunities.
-    Contact your administrator to unsubscribe.
+    Contact your administrator if you wish to unsubscribe.
   </p>"""
