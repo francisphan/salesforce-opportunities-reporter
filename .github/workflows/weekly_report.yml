@@ -34,4 +34,5 @@ jobs:
           GMAIL_CLIENT_SECRET: ${{ secrets.GMAIL_CLIENT_SECRET }}
           GMAIL_REFRESH_TOKEN: ${{ secrets.GMAIL_REFRESH_TOKEN }}
           SUBSCRIBERS: ${{ secrets.SUBSCRIBERS }}
+          REPORT_CC: ${{ secrets.REPORT_CC }}
         run: python main.py
