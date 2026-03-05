@@ -1,0 +1,52 @@
+name: MKT Campaign Follow-Up Reports
+
+on:
+  schedule:
+    # Monday, Tuesday, Friday at 10:00 UTC (7:00 AM Argentina)
+    - cron: '0 10 * * 1,2,5'
+  workflow_dispatch: {}  # Allow manual trigger for testing
+
+jobs:
+  send-reports:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: 'pip'
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Send individual reports
+        env:
+          SF_CLIENT_ID: ${{ secrets.SF_CLIENT_ID }}
+          SF_CLIENT_SECRET: ${{ secrets.SF_CLIENT_SECRET }}
+          SF_REFRESH_TOKEN: ${{ secrets.SF_REFRESH_TOKEN }}
+          SF_INSTANCE_URL: ${{ secrets.SF_INSTANCE_URL }}
+          SF_DOMAIN: ${{ secrets.SF_DOMAIN }}
+          GMAIL_SENDER: ${{ secrets.GMAIL_SENDER }}
+          GMAIL_CLIENT_ID: ${{ secrets.GMAIL_CLIENT_ID }}
+          GMAIL_CLIENT_SECRET: ${{ secrets.GMAIL_CLIENT_SECRET }}
+          GMAIL_REFRESH_TOKEN: ${{ secrets.GMAIL_REFRESH_TOKEN }}
+          MKT_CAMPAIGN_SUBSCRIBERS: ${{ secrets.MKT_CAMPAIGN_SUBSCRIBERS }}
+          MKT_CAMPAIGN_CC: ${{ secrets.MKT_CAMPAIGN_CC }}
+        run: python send_mkt_campaign_report.py
+
+      - name: Send management overview
+        env:
+          SF_CLIENT_ID: ${{ secrets.SF_CLIENT_ID }}
+          SF_CLIENT_SECRET: ${{ secrets.SF_CLIENT_SECRET }}
+          SF_REFRESH_TOKEN: ${{ secrets.SF_REFRESH_TOKEN }}
+          SF_INSTANCE_URL: ${{ secrets.SF_INSTANCE_URL }}
+          SF_DOMAIN: ${{ secrets.SF_DOMAIN }}
+          GMAIL_SENDER: ${{ secrets.GMAIL_SENDER }}
+          GMAIL_CLIENT_ID: ${{ secrets.GMAIL_CLIENT_ID }}
+          GMAIL_CLIENT_SECRET: ${{ secrets.GMAIL_CLIENT_SECRET }}
+          GMAIL_REFRESH_TOKEN: ${{ secrets.GMAIL_REFRESH_TOKEN }}
+          MKT_CAMPAIGN_MANAGERS: ${{ secrets.MKT_CAMPAIGN_MANAGERS }}
+        run: python send_mkt_campaign_overview.py
