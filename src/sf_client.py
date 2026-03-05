@@ -31,7 +31,7 @@ def _auth_oauth() -> Salesforce:
         f"{base_url}/services/oauth2/authorize"
         f"?response_type=code&client_id={client_id}"
         f"&redirect_uri={urllib.parse.quote(redirect_uri, safe='')}"
-        f"&scope=full%20refresh_token"
+        f"&scope=full%20pardot_api%20refresh_token"
     )
 
     print(f"\nOpen this URL in your browser to log in:\n\n  {auth_url}\n")

@@ -15,7 +15,11 @@ from googleapiclient.discovery import build
 
 load_dotenv()
 
-SCOPES = ["https://www.googleapis.com/auth/gmail.send"]
+SCOPES = [
+    "https://www.googleapis.com/auth/gmail.send",
+    "https://www.googleapis.com/auth/spreadsheets",
+    "https://www.googleapis.com/auth/documents",
+]
 TOKEN_CACHE = Path(__file__).parent.parent / ".gmail_token.json"
 
 
