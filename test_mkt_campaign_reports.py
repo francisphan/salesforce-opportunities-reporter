@@ -104,7 +104,7 @@ def send_individual_test(email: str, opps: list[dict], cc: list[str] | None = No
 
 def send_overview_test(email: str, opps: list[dict], cc: list[str] | None = None):
     """Send the management overview."""
-    subject, html = render_overview_report(opps)
+    subject, html = render_overview_report(opps, INSTANCE_URL)
     subject = f"[TEST] {subject}"
     print(f"Sending overview report ({len(opps)} opps) to {email}...")
     email_sender.send_report(subject, html, [email], cc=cc)

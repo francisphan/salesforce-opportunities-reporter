@@ -128,7 +128,99 @@ def fetch_mkt_campaign_data(sf_holder: list) -> tuple[list[dict], dict[str, int]
     return opps, dict(touch_counts)
 
 
-def render_overview_report(opps: list[dict]) -> tuple[str, str]:
+def _format_amount(amount) -> str:
+    if amount is None:
+        return "—"
+    return f"${amount:,.0f}"
+
+
+def _format_date(dt_str) -> str:
+    if not dt_str:
+        return "—"
+    return dt_str[:10]
+
+
+def _days_since(dt_str) -> str:
+    if not dt_str:
+        return "Never"
+    try:
+        last_dt = datetime.strptime(dt_str[:10], "%Y-%m-%d").replace(tzinfo=timezone.utc)
+        days = (datetime.now(timezone.utc) - last_dt).days
+        return f"{days}d"
+    except (ValueError, TypeError):
+        return "—"
+
+
+def _render_stale_detail(opps: list[dict], instance_url: str) -> str:
+    """Render a detail table of all stale opportunities."""
+    stale_opps = [o for o in opps if _is_stale(o)]
+    if not stale_opps:
+        return ""
+
+    # Sort by owner name, then days since activity (worst first)
+    def _sort_key(o):
+        owner = _get_nested(o, "Owner", "Name") or "ZZZ"
+        last = o.get("LastActivityDate") or "0000-00-00"
+        return (owner.lower(), last)
+
+    stale_opps.sort(key=_sort_key)
+
+    rows = []
+    for i, opp in enumerate(stale_opps):
+        bg = "#fff8f0" if i % 2 == 0 else "#ffffff"
+        opp_id = opp.get("Id", "")
+        name = opp.get("Name", "—")
+        if instance_url and opp_id:
+            opp_link = f'<a href="{instance_url}/lightning/r/Opportunity/{opp_id}/view" style="color:#722F37;text-decoration:none;font-weight:500;">{name}</a>'
+        else:
+            opp_link = name
+        owner = _get_nested(opp, "Owner", "Name") or "—"
+        account = _get_nested(opp, "Account", "Name") or "—"
+        stage = opp.get("StageName", "—")
+        amount = _format_amount(opp.get("Amount"))
+        last_activity = _format_date(opp.get("LastActivityDate"))
+        days = _days_since(opp.get("LastActivityDate"))
+        touches = opp.get("_touch_count", 0)
+
+        rows.append(f"""\
+      <tr style="background:{bg};">
+        <td style="padding:8px 12px;border-bottom:1px solid #eee;">{opp_link}</td>
+        <td style="padding:8px 12px;border-bottom:1px solid #eee;">{owner}</td>
+        <td style="padding:8px 12px;border-bottom:1px solid #eee;">{account}</td>
+        <td style="padding:8px 12px;border-bottom:1px solid #eee;">{stage}</td>
+        <td style="padding:8px 12px;border-bottom:1px solid #eee;text-align:right;">{amount}</td>
+        <td style="padding:8px 12px;border-bottom:1px solid #eee;">{last_activity}</td>
+        <td style="padding:8px 12px;border-bottom:1px solid #eee;text-align:center;color:#c0392b;font-weight:600;">{days}</td>
+        <td style="padding:8px 12px;border-bottom:1px solid #eee;text-align:center;">{touches}</td>
+      </tr>""")
+
+    rows_html = "\n".join(rows)
+
+    return f"""\
+    <h3 style="color:#c0392b;margin:28px 0 12px;font-size:15px;">Opportunities Needing Attention ({len(stale_opps)})</h3>
+    <p style="color:#888;font-size:13px;font-style:italic;margin-bottom:12px;">
+      These opportunities have had no activity in the last 7 days.
+    </p>
+    <table style="width:100%;border-collapse:collapse;font-size:14px;margin-bottom:24px;">
+      <thead>
+        <tr style="background:#c0392b;color:#fff;">
+          <th style="padding:10px 12px;text-align:left;">Opportunity</th>
+          <th style="padding:10px 12px;text-align:left;">Owner</th>
+          <th style="padding:10px 12px;text-align:left;">Account</th>
+          <th style="padding:10px 12px;text-align:left;">Stage</th>
+          <th style="padding:10px 12px;text-align:right;">Amount</th>
+          <th style="padding:10px 12px;text-align:left;">Last Activity</th>
+          <th style="padding:10px 12px;text-align:center;">Days Since</th>
+          <th style="padding:10px 12px;text-align:center;">Touches</th>
+        </tr>
+      </thead>
+      <tbody>
+{rows_html}
+      </tbody>
+    </table>"""
+
+
+def render_overview_report(opps: list[dict], instance_url: str = "") -> tuple[str, str]:
     """Render management overview HTML email. Returns (subject, html)."""
     today = date.today().strftime("%B %d, %Y")
 
@@ -141,18 +233,21 @@ def render_overview_report(opps: list[dict]) -> tuple[str, str]:
     subject = f"MKT Campaign Overview — {today} ({total_opps} opportunities)"
 
     # Build pivot table: Owner x Stage
-    pivot = defaultdict(lambda: {"opps": 0, "touches": 0})
-    owner_totals = defaultdict(lambda: {"opps": 0, "touches": 0})
+    pivot = defaultdict(lambda: {"opps": 0, "touches": 0, "stale": 0})
+    owner_totals = defaultdict(lambda: {"opps": 0, "touches": 0, "stale": 0})
 
     for opp in opps:
         owner = _get_nested(opp, "Owner", "Name") or "Unknown"
         stage = opp.get("StageName", "Unknown")
         touches = opp.get("_touch_count", 0)
+        stale = 1 if _is_stale(opp) else 0
 
         pivot[(owner, stage)]["opps"] += 1
         pivot[(owner, stage)]["touches"] += touches
+        pivot[(owner, stage)]["stale"] += stale
         owner_totals[owner]["opps"] += 1
         owner_totals[owner]["touches"] += touches
+        owner_totals[owner]["stale"] += stale
 
     # Sort by owner name, then stage
     sorted_keys = sorted(pivot.keys(), key=lambda k: (k[0].lower(), k[1].lower()))
@@ -165,31 +260,37 @@ def render_overview_report(opps: list[dict]) -> tuple[str, str]:
             # Insert subtotal for previous owner
             if current_owner is not None:
                 t = owner_totals[current_owner]
+                stale_style = "color:#c0392b;" if t['stale'] > 0 else ""
                 table_rows.append(f"""\
       <tr style="background:#f0ece4;font-weight:600;">
         <td style="padding:8px 12px;border-bottom:2px solid #d4c5a9;" colspan="2">{current_owner} — Subtotal</td>
         <td style="padding:8px 12px;border-bottom:2px solid #d4c5a9;text-align:center;">{t['opps']}</td>
+        <td style="padding:8px 12px;border-bottom:2px solid #d4c5a9;text-align:center;{stale_style}">{t['stale']}</td>
         <td style="padding:8px 12px;border-bottom:2px solid #d4c5a9;text-align:center;">{t['touches']}</td>
       </tr>""")
             current_owner = owner
 
         d = pivot[(owner, stage)]
         bg = "#ffffff" if len(table_rows) % 2 == 0 else "#fafafa"
+        stale_style = "color:#c0392b;font-weight:600;" if d['stale'] > 0 else ""
         table_rows.append(f"""\
       <tr style="background:{bg};">
         <td style="padding:8px 12px;border-bottom:1px solid #eee;">{owner}</td>
         <td style="padding:8px 12px;border-bottom:1px solid #eee;">{stage}</td>
         <td style="padding:8px 12px;border-bottom:1px solid #eee;text-align:center;">{d['opps']}</td>
+        <td style="padding:8px 12px;border-bottom:1px solid #eee;text-align:center;{stale_style}">{d['stale']}</td>
         <td style="padding:8px 12px;border-bottom:1px solid #eee;text-align:center;">{d['touches']}</td>
       </tr>""")
 
     # Final owner subtotal
     if current_owner is not None:
         t = owner_totals[current_owner]
+        stale_style = "color:#c0392b;" if t['stale'] > 0 else ""
         table_rows.append(f"""\
       <tr style="background:#f0ece4;font-weight:600;">
         <td style="padding:8px 12px;border-bottom:2px solid #d4c5a9;" colspan="2">{current_owner} — Subtotal</td>
         <td style="padding:8px 12px;border-bottom:2px solid #d4c5a9;text-align:center;">{t['opps']}</td>
+        <td style="padding:8px 12px;border-bottom:2px solid #d4c5a9;text-align:center;{stale_style}">{t['stale']}</td>
         <td style="padding:8px 12px;border-bottom:2px solid #d4c5a9;text-align:center;">{t['touches']}</td>
       </tr>""")
 
@@ -198,6 +299,7 @@ def render_overview_report(opps: list[dict]) -> tuple[str, str]:
       <tr style="background:#4A0E0E;color:#fff;font-weight:700;">
         <td style="padding:10px 12px;" colspan="2">Grand Total</td>
         <td style="padding:10px 12px;text-align:center;">{total_opps}</td>
+        <td style="padding:10px 12px;text-align:center;">{needs_attention}</td>
         <td style="padding:10px 12px;text-align:center;">{total_touches}</td>
       </tr>""")
 
@@ -246,6 +348,7 @@ def render_overview_report(opps: list[dict]) -> tuple[str, str]:
           <th style="padding:10px 12px;text-align:left;">Opp Owner</th>
           <th style="padding:10px 12px;text-align:left;">Stage</th>
           <th style="padding:10px 12px;text-align:center;">Total Opps</th>
+          <th style="padding:10px 12px;text-align:center;">Needs Attention</th>
           <th style="padding:10px 12px;text-align:center;">Total Touches</th>
         </tr>
       </thead>
@@ -254,6 +357,7 @@ def render_overview_report(opps: list[dict]) -> tuple[str, str]:
       </tbody>
     </table>
 
+{_render_stale_detail(opps, instance_url)}
   </div>
   <div style="padding:20px 35px;background:#f8f9fa;font-size:11px;color:#95a5a6;border-top:1px solid #eee;">
     This is an automated report. Contact your administrator if you wish to unsubscribe.
@@ -294,7 +398,8 @@ def main():
         return
 
     # Render overview
-    subject, html = render_overview_report(opps)
+    instance_url = f"https://{sf.sf_instance}"
+    subject, html = render_overview_report(opps, instance_url)
 
     if args.email:
         recipients = [args.email]
