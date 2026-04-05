@@ -1,0 +1,32 @@
+name: Daily PV Campaign Auto-Tagger
+
+on:
+  schedule:
+    # Every day at 9:00 UTC (6:00 AM Argentina time)
+    - cron: '0 9 * * *'
+  workflow_dispatch: {}  # Allow manual trigger for testing
+
+jobs:
+  tag-opps:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: 'pip'
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Run auto-tagger
+        env:
+          SF_CLIENT_ID: ${{ secrets.SF_CLIENT_ID }}
+          SF_CLIENT_SECRET: ${{ secrets.SF_CLIENT_SECRET }}
+          SF_REFRESH_TOKEN: ${{ secrets.SF_REFRESH_TOKEN }}
+          SF_INSTANCE_URL: ${{ secrets.SF_INSTANCE_URL }}
+          SF_DOMAIN: ${{ secrets.SF_DOMAIN }}
+        run: python tag_pv_campaign_opps.py
