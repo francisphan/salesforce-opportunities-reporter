@@ -1,9 +1,9 @@
 name: Daily PV Campaign Auto-Tagger
 
 on:
-  schedule:
-    # Every day at 9:00 UTC (6:00 AM Argentina time)
-    - cron: '0 9 * * *'
+  # schedule:
+  #   # Every day at 9:00 UTC (6:00 AM Argentina time)
+  #   - cron: '0 9 * * *'
   workflow_dispatch: {}  # Allow manual trigger for testing
 
 jobs:
