@@ -31,7 +31,8 @@ OPPS_SOQL = """
     SELECT Id, Name, StageName, Amount, OwnerId, Owner.Name, Owner.Email,
            AccountId, Account.Name, LeadSource, LastActivityDate, CreatedDate
     FROM Opportunity
-    WHERE IsClosed = false AND LeadSource = 'Internal MKT Campaign'
+    WHERE IsClosed = false AND LeadSource = 'Internal - MKT Campaign'
+      AND (NOT Name LIKE '%Test%')
     ORDER BY Owner.Name, StageName
 """
 
