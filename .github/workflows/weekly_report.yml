@@ -33,6 +33,6 @@ jobs:
           GMAIL_CLIENT_ID: ${{ secrets.GMAIL_CLIENT_ID }}
           GMAIL_CLIENT_SECRET: ${{ secrets.GMAIL_CLIENT_SECRET }}
           GMAIL_REFRESH_TOKEN: ${{ secrets.GMAIL_REFRESH_TOKEN }}
-          SUBSCRIBERS: ${{ secrets.SUBSCRIBERS }}
-          REPORT_CC: ${{ secrets.REPORT_CC }}
+          SUBSCRIBERS: ${{ secrets.SUBSCRIBERS }}  # Sales reps who receive their own weekly opp reports
+          REPORT_CC: ${{ secrets.REPORT_CC }}  # CC'd on every weekly report email
         run: python main.py

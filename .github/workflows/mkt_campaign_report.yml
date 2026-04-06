@@ -33,7 +33,8 @@ jobs:
           GMAIL_CLIENT_ID: ${{ secrets.GMAIL_CLIENT_ID }}
           GMAIL_CLIENT_SECRET: ${{ secrets.GMAIL_CLIENT_SECRET }}
           GMAIL_REFRESH_TOKEN: ${{ secrets.GMAIL_REFRESH_TOKEN }}
-          MKT_CAMPAIGN_SUBSCRIBERS: ${{ secrets.MKT_CAMPAIGN_SUBSCRIBERS }}
+          MKT_CAMPAIGN_SUBSCRIBERS: ${{ secrets.MKT_CAMPAIGN_SUBSCRIBERS }}  # Sales reps who receive their own opp reports
+          MKT_CAMPAIGN_CC: ${{ secrets.MKT_CAMPAIGN_CC }}  # CC'd on every individual rep email (managers/stakeholders)
         run: python send_mkt_campaign_report.py
 
       - name: Send management overview
@@ -47,5 +48,5 @@ jobs:
           GMAIL_CLIENT_ID: ${{ secrets.GMAIL_CLIENT_ID }}
           GMAIL_CLIENT_SECRET: ${{ secrets.GMAIL_CLIENT_SECRET }}
           GMAIL_REFRESH_TOKEN: ${{ secrets.GMAIL_REFRESH_TOKEN }}
-          MKT_CAMPAIGN_MANAGERS: ${{ secrets.MKT_CAMPAIGN_MANAGERS }}
+          MKT_CAMPAIGN_MANAGERS: ${{ secrets.MKT_CAMPAIGN_MANAGERS }}  # Recipients of the management summary email
         run: python send_mkt_campaign_overview.py
