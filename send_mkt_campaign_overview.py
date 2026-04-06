@@ -27,11 +27,17 @@ NON_HUMAN_USERNAMES = {
 
 BATCH_SIZE = 200
 
-OPPS_SOQL = """
+SERVICE_TYPE = "TVOM Vineyards"
+LEAD_SOURCE = "Internal - MKT Campaign"
+CAMPAIGN_START = "2026-03-31T00:00:00Z"
+
+OPPS_SOQL = f"""
     SELECT Id, Name, StageName, Amount, OwnerId, Owner.Name, Owner.Email,
            AccountId, Account.Name, LeadSource, LastActivityDate, CreatedDate
     FROM Opportunity
-    WHERE IsClosed = false AND LeadSource = 'Internal - MKT Campaign'
+    WHERE IsClosed = false AND Service__c = '{SERVICE_TYPE}'
+      AND LeadSource = '{LEAD_SOURCE}'
+      AND CreatedDate >= {CAMPAIGN_START}
       AND (NOT Name LIKE '%Test%')
     ORDER BY Owner.Name, StageName
 """
@@ -179,6 +185,7 @@ def _render_stale_detail(opps: list[dict], instance_url: str) -> str:
         account = _get_nested(opp, "Account", "Name") or "—"
         stage = opp.get("StageName", "—")
         amount = _format_amount(opp.get("Amount"))
+        created = _format_date(opp.get("CreatedDate"))
         last_activity = _format_date(opp.get("LastActivityDate"))
         days = _days_since(opp.get("LastActivityDate"))
         touches = opp.get("_touch_count", 0)
@@ -190,6 +197,7 @@ def _render_stale_detail(opps: list[dict], instance_url: str) -> str:
         <td style="padding:8px 12px;border-bottom:1px solid #eee;">{account}</td>
         <td style="padding:8px 12px;border-bottom:1px solid #eee;">{stage}</td>
         <td style="padding:8px 12px;border-bottom:1px solid #eee;text-align:right;">{amount}</td>
+        <td style="padding:8px 12px;border-bottom:1px solid #eee;">{created}</td>
         <td style="padding:8px 12px;border-bottom:1px solid #eee;">{last_activity}</td>
         <td style="padding:8px 12px;border-bottom:1px solid #eee;text-align:center;color:#c0392b;font-weight:600;">{days}</td>
         <td style="padding:8px 12px;border-bottom:1px solid #eee;text-align:center;">{touches}</td>
@@ -210,6 +218,7 @@ def _render_stale_detail(opps: list[dict], instance_url: str) -> str:
           <th style="padding:10px 12px;text-align:left;">Account</th>
           <th style="padding:10px 12px;text-align:left;">Stage</th>
           <th style="padding:10px 12px;text-align:right;">Amount</th>
+          <th style="padding:10px 12px;text-align:left;">Created</th>
           <th style="padding:10px 12px;text-align:left;">Last Activity</th>
           <th style="padding:10px 12px;text-align:center;">Days Since</th>
           <th style="padding:10px 12px;text-align:center;">Touches</th>

@@ -27,11 +27,17 @@ NON_HUMAN_USERNAMES = {
 
 BATCH_SIZE = 200
 
-OPPS_SOQL = """
+SERVICE_TYPE = "TVOM Vineyards"
+LEAD_SOURCE = "Internal - MKT Campaign"
+CAMPAIGN_START = "2026-03-31T00:00:00Z"
+
+OPPS_SOQL = f"""
     SELECT Id, Name, StageName, Amount, OwnerId, Owner.Name, Owner.Email,
            AccountId, Account.Name, LeadSource, LastActivityDate, CreatedDate
     FROM Opportunity
-    WHERE IsClosed = false AND LeadSource = 'Internal - MKT Campaign'
+    WHERE IsClosed = false AND Service__c = '{SERVICE_TYPE}'
+      AND LeadSource = '{LEAD_SOURCE}'
+      AND CreatedDate >= {CAMPAIGN_START}
       AND (NOT Name LIKE '%Test%')
     ORDER BY Owner.Name, StageName
 """
