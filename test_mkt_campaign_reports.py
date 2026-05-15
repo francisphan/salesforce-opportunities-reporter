@@ -47,30 +47,30 @@ def generate_dummy_opps() -> list[dict]:
     opp_num = 0
 
     scenarios = [
-        # (rep_index, stage, amount, created_days_ago, last_activity_days_ago, touches)
+        # (rep_index, stage, amount, created_days_ago, last_activity_days_ago, touches, last_touch_days_ago)
         # Brenda — active and stale mix
-        (0, "Deep Discovery", 75000, 20, 2, 5),
-        (0, "Deep Discovery", 60000, 18, 3, 4),
-        (0, "Deep Discovery", 55000, 25, 10, 2),  # stale
-        (0, "Deep Discovery", 75000, 30, None, 0),  # no activity
-        (0, "Awaiting Demo", 60000, 15, 1, 8),
-        (0, "Awaiting Demo", 55000, 12, 5, 6),
+        (0, "Deep Discovery", 75000, 20, 2, 5, 2),
+        (0, "Deep Discovery", 60000, 18, 3, 4, 3),
+        (0, "Deep Discovery", 55000, 25, 16, 2, 16),  # stale, red (no touch in >15d)
+        (0, "Deep Discovery", 75000, 30, None, 0, None),  # stale, red (never touched)
+        (0, "Awaiting Demo", 60000, 15, 1, 8, 1),
+        (0, "Awaiting Demo", 55000, 12, 5, 6, 5),
         # Pablo — mostly active
-        (1, "Deep Discovery", 60000, 22, 4, 3),
-        (1, "Awaiting Demo", 75000, 10, 1, 10),
-        (1, "Awaiting Demo", 55000, 14, 2, 7),
-        (1, "Awaiting Demo", 60000, 8, 0, 12),
-        (1, "Awaiting Demo", 75000, 16, 9, 3),  # stale
-        (1, "Formal Proposal", 75000, 5, 1, 15),
+        (1, "Deep Discovery", 60000, 22, 4, 3, 4),
+        (1, "Awaiting Demo", 75000, 10, 1, 10, 1),
+        (1, "Awaiting Demo", 55000, 14, 2, 7, 2),
+        (1, "Awaiting Demo", 60000, 8, 0, 12, 0),
+        (1, "Awaiting Demo", 75000, 18, 18, 3, 8),   # stale activity, yellow (touched 8d ago)
+        (1, "Formal Proposal", 75000, 5, 1, 15, 1),
         # Bryan — the rep whose individual report we'll send
-        (2, "Deep Discovery", 60000, 28, 12, 1),  # stale
-        (2, "Deep Discovery", 75000, 21, 3, 6),
-        (2, "Awaiting Demo", 55000, 14, 6, 4),
-        (2, "Formal Proposal", 60000, 7, 0, 9),
-        (2, "Negotiation", 75000, 3, 0, 11),
+        (2, "Deep Discovery", 60000, 28, 22, 1, 22),  # stale, red (no touch in >15d)
+        (2, "Deep Discovery", 75000, 21, 3, 6, 3),
+        (2, "Awaiting Demo", 55000, 16, 16, 2, 10),   # stale activity, yellow (touched 10d ago)
+        (2, "Formal Proposal", 60000, 7, 0, 9, 0),
+        (2, "Negotiation", 75000, 3, 0, 11, 0),
     ]
 
-    for rep_idx, stage, amount, created_ago, activity_ago, touches in scenarios:
+    for rep_idx, stage, amount, created_ago, activity_ago, touches, last_touch_ago in scenarios:
         rep = REPS[rep_idx]
         account = ACCOUNTS[opp_num % len(ACCOUNTS)]
         opp_num += 1
@@ -88,6 +88,7 @@ def generate_dummy_opps() -> list[dict]:
             "CreatedDate": _fake_date(created_ago),
             "LastActivityDate": _fake_date(activity_ago) if activity_ago is not None else None,
             "_touch_count": touches,
+            "_last_touch_date": _fake_date(last_touch_ago) if last_touch_ago is not None else None,
         })
 
     return opps

@@ -30,6 +30,8 @@ BATCH_SIZE = 200
 SERVICE_TYPE = "TVOM Vineyards"
 LEAD_SOURCE = "Internal - MKT Campaign"
 CAMPAIGN_START = "2026-03-31T00:00:00Z"
+STALE_DAYS = 15
+MAX_TOUCHES = 3
 
 OPPS_SOQL = f"""
     SELECT Id, Name, StageName, Amount, OwnerId, Owner.Name, Owner.Email,
@@ -100,7 +102,7 @@ def _get_nested(record: dict, *keys, default=""):
     return val
 
 
-def _is_stale(opp: dict, days: int = 7) -> bool:
+def _is_stale(opp: dict, days: int = STALE_DAYS) -> bool:
     last_activity = opp.get("LastActivityDate")
     if not last_activity:
         return True
@@ -109,6 +111,22 @@ def _is_stale(opp: dict, days: int = 7) -> bool:
         return last_dt < datetime.now(timezone.utc) - timedelta(days=days)
     except (ValueError, TypeError):
         return True
+
+
+def _is_touch_stale(opp: dict, days: int = STALE_DAYS) -> bool:
+    """True if no human touch in the last `days` (or never touched)."""
+    last_touch = opp.get("_last_touch_date")
+    if not last_touch:
+        return True
+    try:
+        last_dt = datetime.strptime(last_touch[:10], "%Y-%m-%d").replace(tzinfo=timezone.utc)
+        return last_dt < datetime.now(timezone.utc) - timedelta(days=days)
+    except (ValueError, TypeError):
+        return True
+
+
+def _needs_attention(opp: dict) -> bool:
+    return _is_stale(opp) and opp.get("_touch_count", 0) <= MAX_TOUCHES
 
 
 def fetch_mkt_campaign_data(sf_holder: list) -> tuple[list[dict], dict[str, int]]:
@@ -125,12 +143,19 @@ def fetch_mkt_campaign_data(sf_holder: list) -> tuple[list[dict], dict[str, int]
     human_ids = _get_human_user_ids(sf_holder, list(all_user_ids)) if all_user_ids else set()
 
     touch_counts = defaultdict(int)
+    last_touch_dates: dict[str, str] = {}
     for t in tasks:
-        if t["CreatedById"] in human_ids:
-            touch_counts[t["WhatId"]] += 1
+        if t["CreatedById"] not in human_ids:
+            continue
+        opp_id = t["WhatId"]
+        touch_counts[opp_id] += 1
+        created = t.get("CreatedDate")
+        if created and created > last_touch_dates.get(opp_id, ""):
+            last_touch_dates[opp_id] = created
 
     for opp in opps:
         opp["_touch_count"] = touch_counts.get(opp["Id"], 0)
+        opp["_last_touch_date"] = last_touch_dates.get(opp["Id"])
 
     return opps, dict(touch_counts)
 
@@ -160,7 +185,7 @@ def _days_since(dt_str) -> str:
 
 def _render_stale_detail(opps: list[dict], instance_url: str) -> str:
     """Render a detail table of all stale opportunities."""
-    stale_opps = [o for o in opps if _is_stale(o)]
+    stale_opps = [o for o in opps if _needs_attention(o)]
     if not stale_opps:
         return ""
 
@@ -173,8 +198,17 @@ def _render_stale_detail(opps: list[dict], instance_url: str) -> str:
     stale_opps.sort(key=_sort_key)
 
     rows = []
+    red_count = 0
     for i, opp in enumerate(stale_opps):
-        bg = "#fff8f0" if i % 2 == 0 else "#ffffff"
+        is_red = _is_touch_stale(opp)
+        if is_red:
+            red_count += 1
+            bg = "#fdedec"
+            indicator_color = "#c0392b"
+        else:
+            bg = "#fef9e7" if i % 2 == 0 else "#fffdf3"
+            indicator_color = "#b7950b"
+
         opp_id = opp.get("Id", "")
         name = opp.get("Name", "—")
         if instance_url and opp_id:
@@ -189,6 +223,7 @@ def _render_stale_detail(opps: list[dict], instance_url: str) -> str:
         last_activity = _format_date(opp.get("LastActivityDate"))
         days = _days_since(opp.get("LastActivityDate"))
         touches = opp.get("_touch_count", 0)
+        last_touch = _format_date(opp.get("_last_touch_date"))
 
         rows.append(f"""\
       <tr style="background:{bg};">
@@ -199,20 +234,28 @@ def _render_stale_detail(opps: list[dict], instance_url: str) -> str:
         <td style="padding:8px 12px;border-bottom:1px solid #eee;text-align:right;">{amount}</td>
         <td style="padding:8px 12px;border-bottom:1px solid #eee;">{created}</td>
         <td style="padding:8px 12px;border-bottom:1px solid #eee;">{last_activity}</td>
-        <td style="padding:8px 12px;border-bottom:1px solid #eee;text-align:center;color:#c0392b;font-weight:600;">{days}</td>
+        <td style="padding:8px 12px;border-bottom:1px solid #eee;text-align:center;color:{indicator_color};font-weight:600;">{days}</td>
         <td style="padding:8px 12px;border-bottom:1px solid #eee;text-align:center;">{touches}</td>
+        <td style="padding:8px 12px;border-bottom:1px solid #eee;">{last_touch}</td>
       </tr>""")
 
     rows_html = "\n".join(rows)
 
+    legend = ""
+    if red_count:
+        legend = (
+            f' Rows shaded <span style="color:#c0392b;font-weight:600;">red</span> '
+            f"have not been touched by a rep in over 15 days ({red_count})."
+        )
+
     return f"""\
-    <h3 style="color:#c0392b;margin:28px 0 12px;font-size:15px;">Opportunities Needing Attention ({len(stale_opps)})</h3>
+    <h3 style="color:#b7950b;margin:28px 0 12px;font-size:15px;">Opportunities Needing Attention ({len(stale_opps)})</h3>
     <p style="color:#888;font-size:13px;font-style:italic;margin-bottom:12px;">
-      These opportunities have had no activity in the last 7 days.
+      These opportunities have had no activity in the last 15 days and fewer than 4 touches.{legend}
     </p>
     <table style="width:100%;border-collapse:collapse;font-size:14px;margin-bottom:24px;">
       <thead>
-        <tr style="background:#c0392b;color:#fff;">
+        <tr style="background:#b7950b;color:#fff;">
           <th style="padding:10px 12px;text-align:left;">Opportunity</th>
           <th style="padding:10px 12px;text-align:left;">Owner</th>
           <th style="padding:10px 12px;text-align:left;">Account</th>
@@ -222,6 +265,7 @@ def _render_stale_detail(opps: list[dict], instance_url: str) -> str:
           <th style="padding:10px 12px;text-align:left;">Last Activity</th>
           <th style="padding:10px 12px;text-align:center;">Days Since</th>
           <th style="padding:10px 12px;text-align:center;">Touches</th>
+          <th style="padding:10px 12px;text-align:left;">Last Touch</th>
         </tr>
       </thead>
       <tbody>
@@ -237,7 +281,7 @@ def render_overview_report(opps: list[dict], instance_url: str = "") -> tuple[st
     total_opps = len(opps)
     owners = {_get_nested(o, "Owner", "Name") for o in opps}
     total_reps = len(owners - {""})
-    needs_attention = sum(1 for o in opps if _is_stale(o))
+    needs_attention = sum(1 for o in opps if _needs_attention(o))
     total_touches = sum(o.get("_touch_count", 0) for o in opps)
 
     subject = f"MKT Campaign Overview — {today} ({total_opps} opportunities)"
@@ -250,7 +294,7 @@ def render_overview_report(opps: list[dict], instance_url: str = "") -> tuple[st
         owner = _get_nested(opp, "Owner", "Name") or "Unknown"
         stage = opp.get("StageName", "Unknown")
         touches = opp.get("_touch_count", 0)
-        stale = 1 if _is_stale(opp) else 0
+        stale = 1 if _needs_attention(opp) else 0
 
         pivot[(owner, stage)]["opps"] += 1
         pivot[(owner, stage)]["touches"] += touches
@@ -347,7 +391,7 @@ def render_overview_report(opps: list[dict], instance_url: str = "") -> tuple[st
     </div>
 
     <p style="color:#888;font-size:13px;font-style:italic;margin-bottom:16px;">
-      "Needs Attention" counts opportunities with no activity in the last 7 days.
+      "Needs Attention" flags opportunities with no activity in the last 15 days and fewer than 4 touches.
       Touch counts reflect human interactions (tasks) only — automated system activity is excluded.
     </p>
 
